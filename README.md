@@ -165,6 +165,41 @@ The primary firmware has FPGA bitstream at offset 0x0 and SW image at 0x50000 so
 ~~~~
 The command creates ossc_\<version\>-\<version_suffix\>.bin which can be copied to fw folder of SD card. A secondary FW (identified by specific key in header) gets automatically installed at flash base address 0x00080000.
 
+
+Safe testing via secondary firmware slot
+----------------------------------------
+The flash chip has two firmware slots: primary (`0x00000000`) and secondary (`0x00080000`). The bootloader decides which slot to write to based on the magic key at the start of the firmware header (see `software/sys_controller/src/firmware.c`):
+
+* Magic `"OSSC"` → written to primary, replacing the running firmware
+* Magic `"OSS2"` → written to secondary, **primary left intact**
+
+A secondary-slot image is dormant until activated through the **Settings opt → Launch 2nd FW** menu entry, which triggers an FPGA reconfiguration from `0x00080000`. A simple power cycle always falls back to the primary slot. This makes the secondary slot a safe target when testing custom builds without risking a brick — if the build hangs or misbehaves, just power-cycle.
+
+`create_fw_img` always writes the `"OSSC"` magic. To produce an `"OSS2"`-keyed variant from an already-generated firmware image, use the included helper (no rebuild required — it only patches byte 3 of the header and recomputes the header CRC; the data section is left untouched):
+
+~~~~
+python3 tools/make_secondary.py tools/ossc_<version>-<suffix>.bin
+~~~~
+
+This writes `tools/ossc_<version>-<suffix>-sec.bin` alongside the original. Copy it to the `fw/` folder of the SD card just like any other firmware image. When the bootloader's update menu shows the version string, it appends ` (sec)` so you can visually confirm before committing the flash:
+
+~~~~
+v1.21-mytest (sec)
+Update? 1=Y, 2=N
+~~~~
+
+Recommended workflow for testing custom builds:
+
+1. Build firmware (`make` in `software/sys_controller/`)
+2. Package it (`create_fw_img ... 1.21 mytest`) → produces `ossc_1.21-mytest.bin`
+3. Patch to secondary (`tools/make_secondary.py tools/ossc_1.21-mytest.bin`) → produces `ossc_1.21-mytest-sec.bin`
+4. Copy the `-sec.bin` to SD card `fw/` folder
+5. Install via menu — confirm the `(sec)` suffix in the prompt before pressing `1`
+6. After install completes, the board reboots running the unchanged primary firmware
+7. Activate the new build via **Settings opt → Launch 2nd FW**
+8. To roll back: power-cycle (boot default is primary), or invoke **Launch 2nd FW** again to toggle
+
+
 Debugging
 --------------------------
 1. Rebuild the software in debug mode:
