@@ -181,14 +181,14 @@ A secondary-slot image is dormant until activated through the **Settings opt →
 python3 tools/make_secondary.py tools/ossc_<version>-<suffix>.bin
 ~~~~
 
-This writes `tools/ossc_<version>-<suffix>-sec.bin` alongside the original. Copy it to the `fw/` folder of the SD card just like any other firmware image. When the bootloader's update menu shows the version string, it appends ` (sec)` so you can visually confirm before committing the flash:
+This writes `tools/ossc_<version>-<suffix>-sec.bin` alongside the original. The helper is pure Python (no dependencies) and is intended to run on the host — the Docker build image does not include Python. Copy it to the `fw/` folder of the SD card just like any other firmware image. When the bootloader's update menu shows the version string, it appends ` (sec)` so you can visually confirm before committing the flash:
 
 ~~~~
 v1.21-mytest (sec)
 Update? 1=Y, 2=N
 ~~~~
 
-Recommended workflow for testing custom builds:
+Recommended workflow for testing custom builds (commands assume native toolchain; if using the Docker setup, wrap `make` and `create_fw_img` invocations in `docker compose run --rm build ...` and run `make_secondary.py` on the host):
 
 1. Build firmware (`make` in `software/sys_controller/`)
 2. Package it (`create_fw_img ... 1.21 mytest`) → produces `ossc_1.21-mytest.bin`
