@@ -48,6 +48,49 @@ gcc tools/bin2hex.c -o tools/bin2hex
 ~~~~
 
 
+Building firmware with Docker (no host toolchain install)
+---------------------------------------------------------
+A pre-configured Docker environment is included for users who want to build the firmware (and host tools) without installing the RISC-V toolchain natively on their host. This path does **not** cover RTL synthesis — Quartus must still be run separately on the host if a new bitstream is required.
+
+Files used: `Dockerfile`, `docker-compose.yml`, `.dockerignore` (all at the repository root). The image is based on Debian Bookworm and works natively on Apple Silicon (linux/arm64) as well as x86_64.
+
+1. Build the image (run once, or after changing the Dockerfile). UID/GID are passed so build artifacts on the bind-mounted directory keep host ownership:
+~~~~
+UID=$(id -u) GID=$(id -g) docker compose build
+~~~~
+
+2. Build the firmware (produces `software/sys_controller/mem_init/flash.bin`):
+~~~~
+docker compose run --rm build bash -c "touch software/sys_controller_bsp/bsp_timestamp && cd software/sys_controller && make"
+~~~~
+The `touch bsp_timestamp` step acknowledges that the pre-generated BSP committed to the repository is up to date, skipping the QSYS regeneration that would otherwise require Quartus.
+
+3. Build the host tools:
+~~~~
+docker compose run --rm build bash -c "cd tools && gcc bin2hex.c -o bin2hex && gcc create_fw_img.c -o create_fw_img"
+~~~~
+
+4. Open an interactive shell inside the container for further work:
+~~~~
+docker compose run --rm build
+~~~~
+
+### Obtaining a bitstream (.rbf) without Quartus
+If you only need to ship a firmware update with a customized software image, you can re-use the bitstream from an official release. The OSSC firmware `.bin` format (see `tools/create_fw_img.c`) is a 512-byte header followed by the raw RBF, `0xFF` padding, and the software image at offset `0x50000`. Extract the RBF region from any official release (example uses `ossc_1.21-aud.bin`):
+~~~~
+mkdir -p output_files
+dd if=ossc_1.21-aud.bin of=output_files/ossc.rbf bs=1 skip=512 count=327680
+~~~~
+Then follow the "Generating SD card image" section below to package your custom `flash.bin` with this RBF.
+
+### Toolchain compatibility note
+Debian Bookworm's `gcc-riscv64-unknown-elf` 12.2 does not provide a multilib variant matching the modern `rv32emc_zicsr_zifencei` ISA string. The repository uses the equivalent `-misa-spec=2.2 -march=rv32emc -mabi=ilp32e` formulation in `software/sys_controller_bsp/public.mk`, which makes Zicsr/Zifencei implicit in the base ISA and resolves correctly to the link-compatible `rv32em/ilp32e` multilib. This is also accepted by toolchains built from source per the instructions above.
+
+### Limitations
+* RTL synthesis (Quartus) is not containerized. Use Quartus on the host or another machine to regenerate `output_files/ossc.rbf`.
+* `make rv-reprogram` (JTAG flashing via `system-console` / `jtagconfig`) is not available in the container — it depends on Quartus tooling and USB Blaster passthrough, which is not supported by Docker on macOS. Use the SD card update method for iterating on the software image.
+
+
 Building RTL (bitstream)
 --------------------------
 1. Initialize project submodules (once after cloning ossc project or when submoduled have been updated)

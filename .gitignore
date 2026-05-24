@@ -24,7 +24,12 @@ software/sys_controller/sys_controller.elf
 .qsys_edit/*
 PLLJ_PLLSPE_INFO.txt
 tools/bin2hex
+tools/create_fw_img
+tools/ossc_*.bin
 software/sys_controller_bsp/bsp_timestamp
 *.a
 software/sys_controller/mem_init/sys_onchip_memory2_0.bin
 software/sys_controller/mem_init/sys_onchip_memory2_0.hex
+software/sys_controller/mem_init/flash.bin
+software/sys_controller/mem_init/flash.hex
+software/sys_controller/mem_init/chunks/

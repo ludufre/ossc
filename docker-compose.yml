@@ -1,0 +1,13 @@
+services:
+  build:
+    build:
+      context: .
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    image: ossc-build:bookworm
+    working_dir: /work
+    volumes:
+      - .:/work
+    stdin_open: true
+    tty: true
